@@ -2,9 +2,9 @@ import numpy as np
 
 
 def generate_pulse_offsets(pri_center, pw_center, freq_center, n_pulses=8):
-    PRI = np.random.normal(pri_center, 15, n_pulses)  
-    pulseW = np.random.normal(pw_center, 0.08, n_pulses)  
-    frequency = np.random.normal(freq_center, 0.03, n_pulses)
+    PRI = np.random.normal(pri_center, 90, n_pulses)  
+    pulseW = np.random.normal(pw_center, 0.3, n_pulses)  
+    frequency = np.random.normal(freq_center, 0.18, n_pulses)
     
     offset_pulse = np.stack([PRI, pulseW, frequency], axis=1)
     

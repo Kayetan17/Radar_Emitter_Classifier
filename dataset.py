@@ -1,4 +1,6 @@
 from PulseCreator import generate_pulse_offsets, EMITTERS
+from features import extract_features
+
 
 
 def build_dataset(samples_per_radar=400):
@@ -12,7 +14,7 @@ def build_dataset(samples_per_radar=400):
 
         for _ in range(samples_per_radar):
             train = generate_pulse_offsets(pri, pw, frequency)
-            X.append(train)
+            X.append(extract_features(train))
             y.append(label_index)
 
     return X, y
