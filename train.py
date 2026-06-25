@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from dataset import build_dataset
 from features import extract_features
 from PulseCreator import EMITTERS, generate_adaptive_train
-
+import joblib
 
 def main():
     X, y = build_dataset(samples_per_radar=400)
@@ -48,14 +48,6 @@ def main():
     print(f"  (was {acc*100:.1f}% on normal radars)")
     
     
-    # ---- ROBUST MODEL: retrain including adaptive examples ----
-    # The drift feature alone wasn't enough — the model never learned to use it
-    # because it only saw steady radars in training. So we build a NEW training
-    # set that mixes steady trains with adaptive ones (labelled by their true
-    # base radar), and train a second model on it.
-
-    # Generate a batch of adaptive trains FOR TRAINING (separate from the
-    # adaptive test set X_cog, so we never test on data we trained on).
     X_adapt_train = []
     y_adapt_train = []
     for label_index, name in enumerate(EMITTERS):
@@ -70,23 +62,27 @@ def main():
     X_adapt_train = np.array(X_adapt_train)
     y_adapt_train = np.array(y_adapt_train)
 
-    # Mix steady training data with the adaptive training data.
     X_robust = np.vstack([X_train, X_adapt_train])
     y_robust = np.concatenate([y_train, y_adapt_train])
 
-    # Train the robust model on the combined set.
     clf_robust = RandomForestClassifier(n_estimators=200, random_state=0)
     clf_robust.fit(X_robust, y_robust)
 
-    # Evaluate the robust model on BOTH test sets:
-    #   - the original steady test set (did we keep static performance?)
-    #   - the cognitive test set X_cog (did we recover on adaptive radars?)
     robust_static_acc = accuracy_score(y_test, clf_robust.predict(X_test))
     robust_cog_acc    = accuracy_score(y_cog,  clf_robust.predict(X_cog))
 
     print(f"\n--- ROBUST MODEL (trained on steady + adaptive) ---")
     print(f"Static accuracy:    {robust_static_acc*100:.1f}%  (naive was {acc*100:.1f}%)")
     print(f"Cognitive accuracy: {robust_cog_acc*100:.1f}%  (naive was {cog_acc*100:.1f}%)")
+    
+    bundle = {
+        "naive_model": clf,
+        "robust_model": clf_robust,
+        "radar_names": list(EMITTERS.keys()),
+    }
+    joblib.dump(bundle, "model.joblib")
+    print("\nSaved both models to model.joblib")
 
 if __name__ == "__main__":
     main()
+    
