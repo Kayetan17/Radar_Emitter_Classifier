@@ -3,6 +3,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from dataset import build_dataset
+from features import extract_features
+from PulseCreator import EMITTERS, generate_adaptive_train
 
 
 def main():
@@ -25,6 +27,66 @@ def main():
     print("\nDetailed report:")
     print(classification_report(y_test, predictions))
 
+
+    X_cog = []
+    y_cog = []
+    for label_index, name in enumerate(EMITTERS):
+        pri  = EMITTERS[name]["pri"]
+        pw   = EMITTERS[name]["pw"]
+        freq = EMITTERS[name]["frequency"]
+        for _ in range(200):
+            train = generate_adaptive_train(pri, pw, freq)
+            X_cog.append(extract_features(train))
+            y_cog.append(label_index)
+
+    X_cog = np.array(X_cog)
+    y_cog = np.array(y_cog)
+
+    cog_predictions = clf.predict(X_cog)
+    cog_acc = accuracy_score(y_cog, cog_predictions)
+    print(f"\nCognitive radar accuracy: {cog_acc*100:.1f}%")
+    print(f"  (was {acc*100:.1f}% on normal radars)")
+    
+    
+    # ---- ROBUST MODEL: retrain including adaptive examples ----
+    # The drift feature alone wasn't enough — the model never learned to use it
+    # because it only saw steady radars in training. So we build a NEW training
+    # set that mixes steady trains with adaptive ones (labelled by their true
+    # base radar), and train a second model on it.
+
+    # Generate a batch of adaptive trains FOR TRAINING (separate from the
+    # adaptive test set X_cog, so we never test on data we trained on).
+    X_adapt_train = []
+    y_adapt_train = []
+    for label_index, name in enumerate(EMITTERS):
+        pri  = EMITTERS[name]["pri"]
+        pw   = EMITTERS[name]["pw"]
+        freq = EMITTERS[name]["frequency"]
+        for _ in range(200):
+            train = generate_adaptive_train(pri, pw, freq)
+            X_adapt_train.append(extract_features(train))
+            y_adapt_train.append(label_index)
+
+    X_adapt_train = np.array(X_adapt_train)
+    y_adapt_train = np.array(y_adapt_train)
+
+    # Mix steady training data with the adaptive training data.
+    X_robust = np.vstack([X_train, X_adapt_train])
+    y_robust = np.concatenate([y_train, y_adapt_train])
+
+    # Train the robust model on the combined set.
+    clf_robust = RandomForestClassifier(n_estimators=200, random_state=0)
+    clf_robust.fit(X_robust, y_robust)
+
+    # Evaluate the robust model on BOTH test sets:
+    #   - the original steady test set (did we keep static performance?)
+    #   - the cognitive test set X_cog (did we recover on adaptive radars?)
+    robust_static_acc = accuracy_score(y_test, clf_robust.predict(X_test))
+    robust_cog_acc    = accuracy_score(y_cog,  clf_robust.predict(X_cog))
+
+    print(f"\n--- ROBUST MODEL (trained on steady + adaptive) ---")
+    print(f"Static accuracy:    {robust_static_acc*100:.1f}%  (naive was {acc*100:.1f}%)")
+    print(f"Cognitive accuracy: {robust_cog_acc*100:.1f}%  (naive was {cog_acc*100:.1f}%)")
 
 if __name__ == "__main__":
     main()

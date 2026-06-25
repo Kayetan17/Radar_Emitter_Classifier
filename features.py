@@ -4,6 +4,10 @@ def extract_features(train):
     pri  = train[:, 0]   # all 8 PRI values
     pw   = train[:, 1]   # all 8 pulse-width values
     frequency = train[:, 2]   # all 8 frequency values
+    
+    half = max(1, len(pri) // 2)
+    pri_drift  = abs(pri[half:].mean()  - pri[:half].mean())
+    freq_drift = abs(frequency[half:].mean() - frequency[:half].mean())
 
     # build a list of summary numbers from pri, pw, frequency
     features = [
@@ -12,7 +16,9 @@ def extract_features(train):
         frequency.mean(),
         pri.std(),
         pw.std(),
-        frequency.std()
+        frequency.std(),
+        pri_drift,
+        freq_drift
         
     ]
     return np.array(features)
